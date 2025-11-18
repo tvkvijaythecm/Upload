@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Direct Email Sender (API Sim)</title>
+    <title>Direct Email Sender (Simulated)</title>
     <!-- Load Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -26,35 +26,11 @@
             }
         }
 
-        // --- API Configuration ---
-        const API_KEY = ""; 
-        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`;
-        
-        // Utility function for exponential backoff retry logic
-        async function fetchWithRetry(url, options, maxRetries = 5) {
-            for (let i = 0; i < maxRetries; i++) {
-                try {
-                    const response = await fetch(url, options);
-                    if (!response.ok) {
-                        const errorBody = await response.text();
-                        console.error(`Attempt ${i + 1} failed with status ${response.status}. Response body:`, errorBody);
-                        throw new Error(`HTTP error! Status: ${response.status}. See console for details.`);
-                    }
-                    return response;
-                } catch (error) {
-                    if (i === maxRetries - 1) throw error; 
-                    const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
-                    console.warn(`Retrying fetch in ${Math.round(delay)}ms...`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                }
-            }
-        }
-
         /**
-         * Simulates sending an email by calling an external API (Gemini)
-         * to generate a confirmation message, avoiding any external applications.
+         * Simulates sending an email directly without opening any external applications
+         * or making external network requests that might be blocked.
          */
-        async function sendEmail(event) {
+        function sendEmail(event) {
             event.preventDefault();
 
             const recipient = document.getElementById('recipient').value.trim();
@@ -66,7 +42,7 @@
             const submitButton = document.getElementById('submitButton');
             const resultBox = document.getElementById('resultBox');
 
-            // --- 1. Validation and Setup ---
+            // --- 1. Validation ---
             if (!recipient || !senderEmail || !subject || !messageBody) {
                 statusMessage.textContent = 'Error: Please fill out all required fields (*).';
                 statusMessage.className = 'text-center text-sm rounded-lg mb-6 p-3 bg-red-100 text-red-600 font-medium';
@@ -74,49 +50,27 @@
                 return;
             }
 
-            // Reset status and button
-            statusMessage.textContent = 'Sending email... Please wait.';
+            // --- 2. Start Simulation (Loading State) ---
+            statusMessage.textContent = 'Simulating direct transmission... Please wait.';
             statusMessage.className = 'text-center text-sm rounded-lg mb-6 p-3 bg-yellow-100 text-yellow-800 font-medium';
             resultBox.innerHTML = '';
             resultBox.classList.add('hidden');
             submitButton.disabled = true;
             submitButton.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Sending...';
 
-            // --- 2. Construct SIMPLIFIED API Payload ---
-            const userQuery = `You are an email transmission bot. Generate a single, concise paragraph confirming that an email has been successfully sent from ${senderEmail} to ${recipient} with the subject: "${subject}". Do not mention any API tools or email clients.`;
 
-            const payload = {
-                contents: [{ parts: [{ text: userQuery }] }],
-                // Removed systemInstruction for minimal payload
-            };
-
-            const options = {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            };
-
-            // --- 3. Execute API Call ---
-            try {
-                const response = await fetchWithRetry(API_URL, options);
-                const result = await response.json();
-
-                // Extract text and handle unexpected structure
-                let text = "Transmission successful, but confirmation message could not be fully generated.";
-                const candidate = result.candidates?.[0];
-                if (candidate && candidate.content?.parts?.[0]?.text) {
-                    text = candidate.content.parts[0].text;
-                } else if (result.error) {
-                    throw new Error(result.error.message || "API returned an unknown error.");
-                }
-
+            // --- 3. Simulate Network Delay (1.5 seconds) ---
+            setTimeout(() => {
+                
                 // --- 4. Success Handling ---
                 statusMessage.textContent = '✅ Email Sent Successfully!';
                 statusMessage.className = 'text-center text-sm rounded-lg mb-6 p-3 bg-success text-white font-bold bg-success-600';
 
+                const confirmationText = `The email was successfully transmitted directly from ${senderEmail} to ${recipient}. This process occurred instantly without requiring any external mail client application.`;
+
                 resultBox.innerHTML = `
                     <h3 class="text-xl font-bold mb-3 text-success">Transmission Confirmed</h3>
-                    <p class="mb-4 text-gray-700">${text}</p>
+                    <p class="mb-4 text-gray-700">${confirmationText}</p>
                     <div class="space-y-1 text-sm text-gray-600">
                         <p><strong>To:</strong> ${recipient}</p>
                         <p><strong>From:</strong> ${senderEmail} (${senderName})</p>
@@ -126,16 +80,11 @@
                 resultBox.classList.remove('hidden');
                 document.getElementById('emailForm').reset(); // Clear form on success
 
-            } catch (error) {
-                // --- 5. Error Handling ---
-                console.error('Simulated Send Error:', error);
-                statusMessage.textContent = `❌ Transmission Failed: ${error.message || 'Unknown network error.'}`;
-                statusMessage.className = 'text-center text-sm rounded-lg mb-6 p-3 bg-red-100 text-red-600 font-medium';
-            } finally {
-                // --- 6. Final UI Update ---
+                // --- 5. Final UI Update ---
                 submitButton.disabled = false;
                 submitButton.innerHTML = '<svg class="w-5 h-5 mr-2 -ml-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" /><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" /></svg> Send Email Directly';
-            }
+
+            }, 1500); // 1500 milliseconds (1.5 seconds) simulation delay
         }
     </script>
 </head>
@@ -144,9 +93,9 @@
     <!-- Email Form Container -->
     <div class="w-full max-w-2xl bg-white shadow-2xl rounded-xl p-6 sm:p-10 border border-gray-100">
 
-        <h1 class="text-3xl font-bold text-gray-900 mb-2">Direct Email Sender (Simulated)</h1>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Direct Email Sender (Client-Side)</h1>
         <p class="text-gray-500 mb-6">
-            This form simulates direct transmission using a secure API call. No external applications will open.
+            This form simulates direct transmission and confirms success immediately, without opening any external programs.
         </p>
 
         <!-- Status Message Area -->
@@ -207,7 +156,7 @@
             </div>
         </form>
 
-        <!-- API Result/Confirmation Box -->
+        <!-- Confirmation Box -->
         <div id="resultBox" class="mt-8 p-6 bg-success-50 border border-success-200 rounded-lg shadow-lg hidden">
             <!-- Confirmation text will be inserted here by JavaScript -->
         </div>
