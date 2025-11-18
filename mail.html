@@ -26,37 +26,42 @@
             }
         }
 
-        const API_KEY = ""; // Placeholder for Canvas API Key
+        // --- Firebase/Auth/API Configuration ---
+        // NOTE: For client-side API calls, we use an empty string for the key.
+        const API_KEY = ""; 
         const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`;
-
+        
         // Utility function for exponential backoff retry logic
         async function fetchWithRetry(url, options, maxRetries = 5) {
             for (let i = 0; i < maxRetries; i++) {
                 try {
                     const response = await fetch(url, options);
                     if (!response.ok) {
-                        // Throw error to trigger retry if rate-limited or transient error
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                        const errorBody = await response.text();
+                        // Log detailed error information before throwing
+                        console.error(`Attempt ${i + 1} failed with status ${response.status}. Response body:`, errorBody);
+                        throw new Error(`HTTP error! Status: ${response.status}. See console for details.`);
                     }
                     return response;
                 } catch (error) {
-                    if (i === maxRetries - 1) throw error; // Re-throw if last attempt failed
+                    if (i === maxRetries - 1) throw error; 
                     const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                    console.warn(`Retrying fetch in ${Math.round(delay)}ms...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
         }
 
         /**
-         * Simulates sending an email by calling an external API (Gemini in this case)
-         * to generate a confirmation message. No external email app is opened.
+         * Simulates sending an email by calling an external API (Gemini)
+         * to generate a confirmation message, avoiding any external applications.
          */
         async function sendEmail(event) {
             event.preventDefault();
 
             const recipient = document.getElementById('recipient').value.trim();
             const senderEmail = document.getElementById('senderEmail').value.trim();
-            const senderName = document.getElementById('senderName').value.trim();
+            const senderName = document.getElementById('senderName').value.trim() || 'Anonymous Sender';
             const subject = document.getElementById('subject').value.trim();
             const messageBody = document.getElementById('message').value.trim();
             const statusMessage = document.getElementById('statusMessage');
@@ -66,20 +71,21 @@
             // --- 1. Validation and Setup ---
             if (!recipient || !senderEmail || !subject || !messageBody) {
                 statusMessage.textContent = 'Error: Please fill out all required fields (*).';
-                statusMessage.className = 'text-center text-sm rounded-lg mb-6 p-3 bg-red-100 text-red-600';
+                statusMessage.className = 'text-center text-sm rounded-lg mb-6 p-3 bg-red-100 text-red-600 font-medium';
+                resultBox.classList.add('hidden');
                 return;
             }
 
             // Reset status and button
             statusMessage.textContent = 'Sending email... Please wait.';
-            statusMessage.className = 'text-center text-sm rounded-lg mb-6 p-3 bg-yellow-100 text-yellow-600';
+            statusMessage.className = 'text-center text-sm rounded-lg mb-6 p-3 bg-yellow-100 text-yellow-800 font-medium';
             resultBox.innerHTML = '';
             resultBox.classList.add('hidden');
             submitButton.disabled = true;
             submitButton.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Sending...';
 
-            // --- 2. Construct API Payload (Simulating Server-Side Confirmation) ---
-            const userQuery = `Confirm the following email details and generate a success message indicating the email has been transmitted directly from the sender's address to the recipient's address.
+            // --- 2. Construct API Payload ---
+            const userQuery = `Confirm the following email details and generate a concise success message (max 3 sentences) indicating the email has been transmitted directly from the sender's address to the recipient's address.
             Sender Name: ${senderName}
             Sender Email: ${senderEmail}
             Recipient Email: ${recipient}
@@ -104,16 +110,23 @@
                 const response = await fetchWithRetry(API_URL, options);
                 const result = await response.json();
 
-                const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "Transmission successful, but confirmation message was empty.";
+                // Extract text and handle unexpected structure
+                let text = "Transmission successful, but confirmation message could not be fully generated.";
+                const candidate = result.candidates?.[0];
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    text = candidate.content.parts[0].text;
+                } else if (result.error) {
+                    throw new Error(result.error.message || "API returned an unknown error.");
+                }
 
                 // --- 4. Success Handling ---
-                statusMessage.textContent = 'Email sent successfully!';
+                statusMessage.textContent = '✅ Email Sent Successfully!';
                 statusMessage.className = 'text-center text-sm rounded-lg mb-6 p-3 bg-success text-white font-bold bg-success-600';
 
                 resultBox.innerHTML = `
-                    <h3 class="text-xl font-semibold mb-2 text-gray-800">Transmission Confirmed</h3>
-                    <p class="mb-4 text-gray-600">${text}</p>
-                    <div class="space-y-1 text-sm text-gray-700">
+                    <h3 class="text-xl font-bold mb-3 text-success">Transmission Confirmed</h3>
+                    <p class="mb-4 text-gray-700">${text}</p>
+                    <div class="space-y-1 text-sm text-gray-600">
                         <p><strong>To:</strong> ${recipient}</p>
                         <p><strong>From:</strong> ${senderEmail} (${senderName})</p>
                         <p><strong>Subject:</strong> ${subject}</p>
@@ -124,9 +137,10 @@
 
             } catch (error) {
                 // --- 5. Error Handling ---
-                console.error('API Error during simulated send:', error);
-                statusMessage.textContent = 'Error: Failed to simulate direct transmission. Check console for details.';
-                statusMessage.className = 'text-center text-sm rounded-lg mb-6 p-3 bg-red-100 text-red-600';
+                // Show the specific error in the UI and console
+                console.error('Simulated Send Error:', error);
+                statusMessage.textContent = `❌ Transmission Failed: ${error.message || 'Unknown network error.'}`;
+                statusMessage.className = 'text-center text-sm rounded-lg mb-6 p-3 bg-red-100 text-red-600 font-medium';
             } finally {
                 // --- 6. Final UI Update ---
                 submitButton.disabled = false;
@@ -140,9 +154,9 @@
     <!-- Email Form Container -->
     <div class="w-full max-w-2xl bg-white shadow-2xl rounded-xl p-6 sm:p-10 border border-gray-100">
 
-        <h1 class="text-3xl font-bold text-gray-900 mb-2">Direct Email Sender</h1>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Direct Email Sender (Simulated)</h1>
         <p class="text-gray-500 mb-6">
-            This form sends your message directly (simulated via API call) without opening any external applications.
+            This form simulates direct transmission using a secure API call. No external applications will open.
         </p>
 
         <!-- Status Message Area -->
