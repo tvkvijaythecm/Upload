@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nano Browser</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Base styles */
+        :root {
+            /* Light Mode Colors */
+            --bg-page: #f9fafb;
+            --bg-card: #ffffff;
+            --bg-primary: #3b82f6;
+            --text-primary: #1f2937;
+            --text-secondary: #4b5563;
+            --border-color: #e5e7eb;
+            --bg-widget: #437dff; /* Blue background for widget */
+            --text-widget: #ffffff;
+        }
+        [data-theme="dark"] {
+            /* Dark Mode Colors */
+            --bg-page: #1f2937;
+            --bg-card: #374151;
+            --bg-primary: #60a5fa;
+            --text-primary: #f9fafb;
+            --text-secondary: #d1d5db;
+            --border-color: #4b5563;
+            --bg-widget: #1e3a8a; /* Darker blue background for widget */
+            --text-widget: #ffffff;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-page);
+            color: var(--text-primary);
+            transition: background-color 0.3s, color 0.3s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* Mobile Frame Styling */
+        #browser-frame {
+            width: 100%;
+            max-width: 420px;
+            height: 95vh;
+            max-height: 800px;
+            border: 1px solid var(--border-color);
+            border-radius: 2rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background-color: var(--bg-card);
+        }
+
+        /* Widget Styling based on image */
+        #widget-container {
+            background-color: var(--bg-widget);
+            color: var(--text-widget);
+            border-radius: 1.5rem;
+            width: 90%;
+            padding: 1.5rem;
+            margin: 2rem auto;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        #url-bar {
+            background-color: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        #content-iframe {
+            flex-grow: 1;
+            width: 100%;
+            border: none;
+            background-color: var(--bg-page);
+        }
+
+        /* Modal styling */
+        .modal {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .modal-content {
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            max-width: 90%;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <!-- Browser Frame -->
+    <div id="browser-frame">
+        
+        <!-- Top Bar (Navigation & Controls) -->
+        <header id="url-bar">
+            <!-- Back Button -->
+            <button onclick="historyBack()" class="p-2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition duration-150">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            
+            <!-- Address Bar Input -->
+            <input type="url" id="address-input" placeholder="Enter URL or search term..." onkeydown="if(event.key === 'Enter') navigate()"
+                   class="flex-grow p-2 rounded-full text-sm focus:outline-none bg-gray-100 dark:bg-gray-700 dark:text-gray-100 placeholder-gray-500 border border-gray-200 dark:border-gray-600">
+
+            <!-- Go/Reload Button -->
+            <button onclick="navigate()" class="p-2 text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition duration-150">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+            </button>
+            
+            <!-- Bookmark Button -->
+            <button onclick="openModal('bookmarkModal')" class="p-2 text-gray-500 hover:text-yellow-500 dark:hover:text-yellow-400 transition duration-150">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+            </button>
+            
+            <!-- Theme Toggle -->
+            <button id="theme-toggle" onclick="toggleTheme()" class="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition duration-150">
+                <!-- SVG will be updated by JS -->
+            </button>
+        </header>
+
+        <!-- Home/Widget Screen -->
+        <div id="home-screen" class="p-4 flex flex-col items-center justify-start h-full">
+            <h1 class="text-2xl font-bold mb-8 text-center mt-8">Nano Browser Home</h1>
+            
+            <!-- Day, Time, and Weather Widget (Matching the Image Style) -->
+            <div id="widget-container" class="transition duration-300">
+                <div id="date-display" class="text-md font-semibold mb-4"></div>
+                <div class="flex items-center justify-center space-x-4 mb-2">
+                    <div id="temp-display" class="text-7xl font-light"></div>
+                    <div id="weather-icon" class="text-6xl"></div>
+                </div>
+                <div id="time-display" class="text-3xl font-light"></div>
+                <p class="text-sm opacity-80 mt-2">Mock Weather Data</p>
+            </div>
+            
+            <!-- Proxy Setting (Explanation of Limitation) -->
+            <div class="w-full max-w-sm mt-8 p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 transition duration-300">
+                <p class="text-xs font-semibold uppercase text-red-500 mb-2">Proxy Note (Important)</p>
+                <p class="text-xs text-gray-600 dark:text-gray-400">
+                    A true web proxy requires server-side routing (e.g., PHP/Node.js) and cannot be implemented securely with client-side JavaScript alone. 
+                    The browser will navigate directly to the URL in the iframe. Use the "Homepage" feature for persistent proxy configuration if you run a server-side proxy service.
+                </p>
+                <div class="mt-3">
+                    <label for="proxy-input" class="text-sm font-medium block mb-1">Proxy Server URL (Optional Mock)</label>
+                    <input type="text" id="proxy-input" value="http://my.proxy:8080" disabled
+                           class="w-full p-2 text-xs rounded-lg bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 cursor-not-allowed">
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content (Browser) -->
+        <!-- Sandbox is used for security, but limits some modern site functionality and full proxy capability -->
+        <iframe id="content-iframe" class="hidden" sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-pointer-lock" allowfullscreen></iframe>
+
+        <!-- Bottom Navigation Bar -->
+        <footer class="flex justify-around items-center p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-b-[2rem]">
+            <button onclick="historyBack()" class="p-2 text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition duration-150">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12" /></svg>
+            </button>
+            <button onclick="historyForward()" class="p-2 text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition duration-150">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+            </button>
+            <!-- Home Button -->
+            <button onclick="goHome()" class="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition duration-150 shadow-md">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+            </button>
+            <!-- Settings/Features Button -->
+            <button onclick="openModal('featuresModal')" class="p-2 text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition duration-150">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.526.315 1.137.408 1.724 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            </button>
+            <!-- More Features Button -->
+            <button onclick="openModal('featuresModal')" class="p-2 text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition duration-150">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" /></svg>
+            </button>
+        </footer>
+    </div>
+    
+    <!-- MODALS -->
+
+    <!-- Bookmark Modal -->
+    <div id="bookmarkModal" class="modal fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+        <div class="modal-content w-full rounded-xl p-6 shadow-2xl transition duration-300">
+            <h2 class="text-xl font-bold mb-4 border-b pb-2 border-gray-200 dark:border-gray-600">Bookmarks</h2>
+            <div id="bookmark-list" class="space-y-2 max-h-60 overflow-y-auto">
+                <p class="text-gray-500 dark:text-gray-400 text-sm" id="no-bookmarks">No bookmarks saved.</p>
+            </div>
+            <button onclick="closeModal('bookmarkModal')" class="mt-6 w-full py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">Close</button>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div id="historyModal" class="modal fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+        <div class="modal-content w-full rounded-xl p-6 shadow-2xl transition duration-300">
+            <h2 class="text-xl font-bold mb-4 border-b pb-2 border-gray-200 dark:border-gray-600">History</h2>
+            <div id="history-list" class="space-y-2 max-h-60 overflow-y-auto">
+                <p class="text-gray-500 dark:text-gray-400 text-sm" id="no-history">No history found.</p>
+            </div>
+            <button onclick="clearHistory()" class="mt-6 w-full py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">Clear History</button>
+            <button onclick="closeModal('historyModal')" class="mt-3 w-full py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">Close</button>
+        </div>
+    </div>
+    
+    <!-- Features/Settings Modal -->
+    <div id="featuresModal" class="modal fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+        <div class="modal-content w-full rounded-xl p-6 shadow-2xl transition duration-300">
+            <h2 class="text-xl font-bold mb-4 border-b pb-2 border-gray-200 dark:border-gray-600">Browser Settings</h2>
+            
+            <button onclick="openModal('historyModal'); closeModal('featuresModal');" class="flex justify-between items-center w-full p-3 mb-3 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition">
+                <span>View History</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zm-1 9a1 1 0 01-2 0V7a1 1 0 112 0v4zm4 0a1 1 0 11-2 0V7a1 1 0 112 0v4z" clip-rule="evenodd" /></svg>
+            </button>
+
+            <button onclick="clearCookies()" class="flex justify-between items-center w-full p-3 mb-3 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition">
+                <span>Clear Cookies (Local Data)</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.102a2 2 0 00.592 1.414L10 9.707l4.408-4.408A2 2 0 0015 5.102V3a1 1 0 112 0v2.102a4 4 0 01-1.17 2.828L13 12.586V15a1 1 0 01-1 1H8a1 1 0 01-1-1v-2.414l-2.83-2.83A4 4 0 013 5.102V3a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+            </button>
+
+            <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                <label for="homepage-input" class="block text-sm font-medium mb-2">Set Homepage URL:</label>
+                <input type="url" id="homepage-input" placeholder="e.g., https://www.google.com"
+                       class="w-full p-2 rounded-lg text-sm focus:outline-none bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600">
+                <button onclick="setHomepage()" class="mt-2 w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition text-sm">Save Homepage</button>
+            </div>
+
+            <button onclick="closeModal('featuresModal')" class="mt-6 w-full py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">Close</button>
+        </div>
+    </div>
+
+
+    <script>
+        const STORAGE_KEY_THEME = 'browserTheme';
+        const STORAGE_KEY_HISTORY = 'browserHistory';
+        const STORAGE_KEY_BOOKMARKS = 'browserBookmarks';
+        const STORAGE_KEY_HOMEPAGE = 'browserHomepage';
+
+        const browserIframe = document.getElementById('content-iframe');
+        const homeScreen = document.getElementById('home-screen');
+        const addressInput = document.getElementById('address-input');
+        const dateDisplay = document.getElementById('date-display');
+        const timeDisplay = document.getElementById('time-display');
+        const tempDisplay = document.getElementById('temp-display');
+        const weatherIcon = document.getElementById('weather-icon');
+        const themeToggle = document.getElementById('theme-toggle');
+
+        let appHistory = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || '[]');
+        let appBookmarks = JSON.parse(localStorage.getItem(STORAGE_KEY_BOOKMARKS) || '[]');
+        let homepageUrl = localStorage.getItem(STORAGE_KEY_HOMEPAGE) || 'https://www.google.com';
+
+        // --- Utility Functions ---
+
+        function saveStorage() {
+            localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(appHistory));
+            localStorage.setItem(STORAGE_KEY_BOOKMARKS, JSON.stringify(appBookmarks));
+            localStorage.setItem(STORAGE_KEY_HOMEPAGE, homepageUrl);
+        }
+
+        function formatUrl(url) {
+            if (url === 'about:home') return url;
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                // Assume search if it contains spaces or is a short, simple term, otherwise prepend https://
+                if (url.includes(' ') || !url.includes('.')) {
+                    return 'https://www.google.com/search?q=' + encodeURIComponent(url);
+                }
+                return 'https://' + url;
+            }
+            return url;
+        }
+
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+            // Update lists on modal open
+            if (id === 'historyModal') {
+                renderHistory();
+            } else if (id === 'bookmarkModal') {
+                renderBookmarks();
+            } else if (id === 'featuresModal') {
+                document.getElementById('homepage-input').value = homepageUrl;
+            }
+        }
+
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.classList.remove('flex');
+                modal.classList.add('hidden');
+            }
+        }
+
+        // --- Theme / UI Functions ---
+
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem(STORAGE_KEY_THEME, theme);
+            updateThemeToggleIcon(theme);
+        }
+
+        function updateThemeToggleIcon(theme) {
+            themeToggle.innerHTML = theme === 'dark'
+                ? '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>' // Sun
+                : '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>'; // Moon
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            setTheme(newTheme);
+        }
+
+        function updateWidgets() {
+            const now = new Date();
+            
+            // Date (e.g., Monday, June 18)
+            const dateOptions = { weekday: 'long', month: 'long', day: 'numeric' };
+            dateDisplay.textContent = now.toLocaleDateString('en-US', dateOptions);
+
+            // Time (e.g., 8:30 AM)
+            const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
+            timeDisplay.textContent = now.toLocaleTimeString('en-US', timeOptions);
+            
+            // Mock Weather
+            // In a real app, this would use a weather API.
+            const temps = [23, 17, 28, 19, 25];
+            const icons = {
+                'Sun': '☀️',
+                'Cloudy': '☁️',
+                'Rain': '🌧️'
+            };
+            const weather = [
+                {temp: 23, icon: icons.Sun, description: 'Sunny'},
+                {temp: 17, icon: icons.Rain, description: 'Rainy'},
+                {temp: 28, icon: icons.Sun, description: 'Hot'},
+                {temp: 19, icon: icons.Cloudy, description: 'Cloudy'}
+            ];
+            
+            // Cycle through mock weather daily (using the day of the month for selection)
+            const dayOfMonth = now.getDate();
+            const currentWeather = weather[dayOfMonth % weather.length];
+
+            tempDisplay.textContent = `${currentWeather.temp}°`;
+            weatherIcon.textContent = currentWeather.icon;
+            
+            // Update widget background to match attached image style (blue)
+            const widget = document.getElementById('widget-container');
+            if (currentWeather.icon === icons.Rain) {
+                widget.style.backgroundColor = 'var(--bg-widget)';
+            } else {
+                widget.style.backgroundColor = 'var(--bg-widget)';
+            }
+        }
+
+        // --- Core Browser Functions ---
+
+        function goHome() {
+            browserIframe.src = '';
+            browserIframe.classList.add('hidden');
+            homeScreen.classList.remove('hidden');
+            addressInput.value = '';
+            document.title = 'Nano Browser';
+        }
+
+        function navigate() {
+            const input = addressInput.value.trim();
+            if (!input) return;
+
+            const targetUrl = formatUrl(input);
+
+            // Show iframe and hide home screen
+            homeScreen.classList.add('hidden');
+            browserIframe.classList.remove('hidden');
+            browserIframe.src = targetUrl;
+            
+            // Update address bar and history
+            addressInput.value = targetUrl;
+            document.title = 'Loading: ' + targetUrl;
+
+            // Add to history (only if it's not a re-load of the same page)
+            if (appHistory.length === 0 || appHistory[0].url !== targetUrl) {
+                appHistory.unshift({
+                    url: targetUrl,
+                    title: 'Loading...', // Will be updated on load
+                    timestamp: new Date().toISOString()
+                });
+                // Keep history size reasonable (e.g., last 50 entries)
+                if (appHistory.length > 50) appHistory.pop();
+                saveStorage();
+            }
+        }
+        
+        // Listen for iframe load to update title and history title (best effort, may be blocked by SOP)
+        browserIframe.onload = function() {
+            try {
+                // Attempt to get the real title (might fail due to SOP)
+                const iframeTitle = browserIframe.contentDocument.title;
+                document.title = iframeTitle || browserIframe.src;
+                
+                if (appHistory.length > 0) {
+                    appHistory[0].title = iframeTitle || browserIframe.src;
+                    saveStorage();
+                }
+            } catch (e) {
+                // If SOP blocks contentDocument access
+                document.title = 'Web Page';
+                if (appHistory.length > 0) {
+                    appHistory[0].title = browserIframe.src;
+                    saveStorage();
+                }
+            }
+        };
+
+        function historyBack() {
+            if (browserIframe.contentWindow) {
+                browserIframe.contentWindow.history.back();
+            }
+        }
+        
+        function historyForward() {
+            if (browserIframe.contentWindow) {
+                browserIframe.contentWindow.history.forward();
+            }
+        }
+
+        // --- Feature Implementation ---
+
+        function setHomepage() {
+            const input = document.getElementById('homepage-input').value.trim();
+            homepageUrl = formatUrl(input);
+            saveStorage();
+            
+            // Optional: immediately set current tab to new homepage
+            browserIframe.src = homepageUrl;
+            addressInput.value = homepageUrl;
+
+            // Display a message (using the address bar as a temporary status bar)
+            addressInput.placeholder = 'Homepage saved successfully!';
+            setTimeout(() => {
+                addressInput.placeholder = 'Enter URL or search term...';
+            }, 2000);
+            
+            closeModal('featuresModal');
+            goHome();
+        }
+
+        function clearHistory() {
+            appHistory = [];
+            saveStorage();
+            renderHistory();
+            // Show message instead of alert
+            const list = document.getElementById('history-list');
+            list.innerHTML = `<p class="text-sm text-green-500 font-semibold">History cleared successfully!</p>`;
+            setTimeout(() => {
+                list.innerHTML = `<p class="text-gray-500 dark:text-gray-400 text-sm" id="no-history">No history found.</p>`;
+            }, 1500);
+        }
+
+        function clearCookies() {
+            // NOTE: This only clears localStorage (app data), not the iframe's cookies (which is impossible from client JS)
+            localStorage.clear(); 
+            // Reset app state immediately after clearing
+            appHistory = [];
+            appBookmarks = [];
+            homepageUrl = 'https://www.google.com';
+            saveStorage();
+            
+            // Display message
+            const button = document.querySelector('#featuresModal button[onclick="clearCookies()"]');
+            button.innerHTML = '<span>Local Data Cleared! (Please refresh if needed)</span>';
+            button.classList.remove('bg-gray-100');
+            button.classList.add('bg-green-500', 'text-white');
+
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('history-list');
+            list.innerHTML = '';
+            
+            if (appHistory.length === 0) {
+                list.innerHTML = `<p class="text-gray-500 dark:text-gray-400 text-sm" id="no-history">No history found.</p>`;
+                return;
+            }
+
+            appHistory.forEach((item, index) => {
+                const li = document.createElement('a');
+                li.href = '#';
+                li.onclick = (e) => { e.preventDefault(); addressInput.value = item.url; navigate(); closeModal('historyModal'); };
+                li.className = 'block p-2 text-sm text-left hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg truncate transition duration-150';
+                li.innerHTML = `<span class="font-medium">${item.title || item.url}</span> <span class="text-xs text-gray-500 dark:text-gray-400 block">${new Date(item.timestamp).toLocaleTimeString()}</span>`;
+                list.appendChild(li);
+            });
+        }
+        
+        function renderBookmarks() {
+            const list = document.getElementById('bookmark-list');
+            list.innerHTML = '';
+            
+            // Add current page to bookmarks option
+            const currentUrl = addressInput.value.trim();
+            if (currentUrl && currentUrl !== 'about:home' && !appBookmarks.some(b => b.url === currentUrl)) {
+                const saveButton = document.createElement('button');
+                saveButton.onclick = () => saveBookmark(currentUrl);
+                saveButton.className = 'w-full py-2 mb-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition text-sm';
+                saveButton.textContent = 'Save Current Page as Bookmark';
+                list.appendChild(saveButton);
+            } else if (currentUrl && appBookmarks.some(b => b.url === currentUrl)) {
+                 const savedMessage = document.createElement('p');
+                 savedMessage.className = 'text-sm text-green-500 font-semibold mb-3';
+                 savedMessage.textContent = 'Current page is already bookmarked!';
+                 list.appendChild(savedMessage);
+            }
+
+            if (appBookmarks.length === 0) {
+                list.innerHTML += `<p class="text-gray-500 dark:text-gray-400 text-sm" id="no-bookmarks">No bookmarks saved.</p>`;
+                return;
+            }
+
+            appBookmarks.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center p-2 text-sm text-left hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition duration-150';
+                
+                const link = document.createElement('a');
+                link.href = '#';
+                link.onclick = (e) => { e.preventDefault(); addressInput.value = item.url; navigate(); closeModal('bookmarkModal'); };
+                link.className = 'truncate flex-grow mr-2';
+                link.innerHTML = `<span class="font-medium">${item.title || item.url}</span> <span class="text-xs text-gray-500 dark:text-gray-400 block">${item.url}</span>`;
+                
+                const deleteButton = document.createElement('button');
+                deleteButton.onclick = (e) => { e.stopPropagation(); deleteBookmark(index); };
+                deleteButton.className = 'text-red-500 hover:text-red-700 p-1 rounded-full';
+                deleteButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>`;
+
+                div.appendChild(link);
+                div.appendChild(deleteButton);
+                list.appendChild(div);
+            });
+        }
+        
+        function saveBookmark(url) {
+            const title = document.title === 'Web Page' ? url : document.title;
+            appBookmarks.unshift({ url, title });
+            saveStorage();
+            renderBookmarks();
+        }
+
+        function deleteBookmark(index) {
+            appBookmarks.splice(index, 1);
+            saveStorage();
+            renderBookmarks();
+        }
+
+        // --- Initialization ---
+
+        function init() {
+            // 1. Set initial theme
+            const preferredTheme = localStorage.getItem(STORAGE_KEY_THEME) || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            setTheme(preferredTheme);
+
+            // 2. Set homepage URL
+            if (homepageUrl) {
+                document.getElementById('homepage-input').value = homepageUrl;
+            }
+            
+            // 3. Start widgets loop
+            updateWidgets();
+            setInterval(updateWidgets, 1000); // Update time/date every second
+            
+            // 4. Load homepage into address bar for display
+            addressInput.value = homepageUrl;
+            
+            // 5. Navigate to the local home screen first
+            goHome(); 
+        }
+
+        // Run initialization when the window loads
+        window.onload = init;
+    </script>
+</body>
+</html>
+
