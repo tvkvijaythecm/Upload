@@ -26,8 +26,7 @@
             }
         }
 
-        // --- Firebase/Auth/API Configuration ---
-        // NOTE: For client-side API calls, we use an empty string for the key.
+        // --- API Configuration ---
         const API_KEY = ""; 
         const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`;
         
@@ -38,7 +37,6 @@
                     const response = await fetch(url, options);
                     if (!response.ok) {
                         const errorBody = await response.text();
-                        // Log detailed error information before throwing
                         console.error(`Attempt ${i + 1} failed with status ${response.status}. Response body:`, errorBody);
                         throw new Error(`HTTP error! Status: ${response.status}. See console for details.`);
                     }
@@ -84,19 +82,12 @@
             submitButton.disabled = true;
             submitButton.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Sending...';
 
-            // --- 2. Construct API Payload ---
-            const userQuery = `Confirm the following email details and generate a concise success message (max 3 sentences) indicating the email has been transmitted directly from the sender's address to the recipient's address.
-            Sender Name: ${senderName}
-            Sender Email: ${senderEmail}
-            Recipient Email: ${recipient}
-            Subject: ${subject}
-            Message Snippet (first 50 chars): "${messageBody.substring(0, 50)}..."`;
+            // --- 2. Construct SIMPLIFIED API Payload ---
+            const userQuery = `You are an email transmission bot. Generate a single, concise paragraph confirming that an email has been successfully sent from ${senderEmail} to ${recipient} with the subject: "${subject}". Do not mention any API tools or email clients.`;
 
             const payload = {
                 contents: [{ parts: [{ text: userQuery }] }],
-                systemInstruction: {
-                    parts: [{ text: "You are a secure Mail Service Confirmation Bot. Your task is to confirm that the email request details are valid and to output a single, clear paragraph confirming the direct transmission was successful. Do not mention any API, Gemini, or email client applications. Just confirm the send operation." }]
-                },
+                // Removed systemInstruction for minimal payload
             };
 
             const options = {
@@ -137,7 +128,6 @@
 
             } catch (error) {
                 // --- 5. Error Handling ---
-                // Show the specific error in the UI and console
                 console.error('Simulated Send Error:', error);
                 statusMessage.textContent = `❌ Transmission Failed: ${error.message || 'Unknown network error.'}`;
                 statusMessage.className = 'text-center text-sm rounded-lg mb-6 p-3 bg-red-100 text-red-600 font-medium';
